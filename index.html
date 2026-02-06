@@ -1,0 +1,501 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <link rel="icon" href="data:,">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Nova Make | The Joy of Building</title>
+    
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;600;800&family=Quicksand:wght@500;700&display=swap" rel="stylesheet">
+    <script src="https://unpkg.com/blockly/blockly.min.js"></script>
+    <script src="https://unpkg.com/blockly/javascript_compressed"></script>
+    
+    <style>
+        :root {
+            --primary: #6C5CE7;
+            --secondary: #00CEC9;
+            --accent: #FF7675;
+            --sidebar-bg: #FFFFFF;
+            --workspace-bg: #F0F2F5;
+            --text-main: #2D3436;
+        }
+
+        body, html {
+            margin: 0; padding: 0; height: 100vh;
+            background-color: var(--workspace-bg);
+            color: var(--text-main);
+            font-family: 'Outfit', sans-serif;
+            display: flex; flex-direction: column; overflow: hidden;
+        }
+
+        /* --- HEADER MODERNO --- */
+        header {
+            height: 70px;
+            background: white;
+            padding: 0 30px;
+            display: flex; align-items: center; justify-content: space-between;
+            z-index: 100;
+            border-bottom: 2px solid rgba(0,0,0,0.03);
+        }
+
+        .logo-container {
+            display: flex; align-items: center; gap: 12px;
+            font-size: 22px; font-weight: 800;
+            color: var(--primary);
+            letter-spacing: -0.5px;
+        }
+
+        .btn-launch {
+            background: linear-gradient(135deg, var(--primary), #a29bfe);
+            color: white; border: none;
+            padding: 12px 28px; border-radius: 14px;
+            font-family: 'Outfit', sans-serif; font-weight: 700;
+            cursor: pointer; transition: 0.3s;
+            box-shadow: 0 10px 20px rgba(108, 92, 231, 0.2);
+        }
+
+        .btn-launch:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 15px 25px rgba(108, 92, 231, 0.3);
+        }
+
+        /* --- CONTENEDOR PRINCIPAL --- */
+        #main-wrapper {
+            flex: 1; display: flex; position: relative;
+        }
+
+        #blocklyDiv {
+            flex: 1; height: 100%; width: 100%;
+        }
+
+        /* --- HACKEO DE ESTILO DE LA BARRA LATERAL (TOOLBOX) --- */
+        .blocklyToolboxDiv {
+            background-color: var(--sidebar-bg) !important;
+            width: 260px !important;
+            border-right: none !important;
+            padding: 15px !important;
+            box-shadow: 10px 0 30px rgba(0,0,0,0.02);
+            z-index: 50;
+        }
+
+        /* Cada categoría del menú */
+        .blocklyTreeRow {
+            height: 50px !important;
+            margin-bottom: 8px !important;
+            padding: 0 15px !important;
+            border-radius: 12px !important;
+            border: none !important;
+            display: flex !important;
+            align-items: center !important;
+            transition: all 0.2s ease !important;
+        }
+
+        /* Color de fondo al pasar el mouse por las categorías */
+        .blocklyTreeRow:hover {
+            background-color: #F7F8FF !important;
+        }
+
+        /* Categoría seleccionada */
+        .blocklyTreeSelected {
+            background-color: #F0EDFF !important;
+        }
+
+        .blocklyTreeLabel {
+            font-family: 'Outfit', sans-serif !important;
+            font-weight: 600 !important;
+            font-size: 15px !important;
+            color: #4A4A4A !important;
+        }
+
+        /* Estilo de los bloques dentro del menú desplegable (Flyout) */
+        .blocklyFlyoutBackground {
+            fill: rgba(255, 255, 255, 0.95) !important;
+            fill-opacity: 1 !important;
+        }
+
+        /* Scrollbar de la Toolbox */
+        .blocklyToolboxContents {
+            padding: 0.5em !important;
+        }
+
+        /* Estética de los bloques */
+        .blocklyBlockBackground {
+            filter: drop-shadow(0 6px 12px rgba(0,0,0,0.08));
+        }
+
+        .blocklyText {
+            font-family: 'Quicksand', sans-serif !important;
+            font-weight: 600 !important;
+            fill: #2D3436 !important;
+        }
+
+        .blocklyFieldText {
+            fill: #2D3436 !important;
+            font-weight: 600 !important;
+        }
+
+        .blocklyFlyoutLabel text {
+            fill: #4A4A4A !important;
+            font-weight: 700 !important;
+        }
+
+        /* Acento en bloques seleccionados */
+        .blocklySelected > .blocklyBlockBackground {
+            stroke: rgba(0,0,0,0.06) !important;
+            stroke-width: 2px !important;
+        }
+
+        /* Más contraste para categorías y badges */
+        .blocklyTreeLabel::before {
+            content: '';
+            display: inline-block;
+            width: 10px; height: 10px; margin-right: 10px;
+            vertical-align: middle; border-radius: 3px;
+        }
+    </style>
+</head>
+<body>
+    <header>
+        <div style="display:flex;align-items:center;gap:16px">
+            <div class="logo-container">
+                <div style="background: var(--primary); width: 35px; height: 35px; border-radius: 10px; display: grid; place-items: center; color: white;">🚀</div>
+                Nova Make
+            </div>
+            <div style="display:flex;flex-direction:column">
+                <div style="font-size:12px;color:#6b7280">Proyecto</div>
+                <div id="projectNameHeader" style="font-weight:700">Sin proyecto</div>
+            </div>
+            <button id="newProjectBtn" class="btn-launch" style="background:linear-gradient(135deg,#00CEC9,#00b2a9);">Nuevo Proyecto</button>
+        </div>
+        <div style="margin-left:auto"><button class="btn-launch" onclick="deploy()">Lanzar a la Nube</button></div>
+    </header>
+
+    <div id="main-wrapper">
+        <div id="blocklyDiv"></div>
+    </div>
+
+    <script src="blocks.js"></script>
+    <script src="generator.js"></script>
+    <script>
+        const toolbox = {
+            "kind": "categoryToolbox",
+            "contents": [
+                {
+                    "kind": "category", 
+                    "name": "🏗️ Núcleo y Config", 
+                    "colour": "#6C5CE7",
+                    "contents": [
+                        { "kind": "block", "type": "bot_setup" },
+                        { "kind": "block", "type": "token_input" },
+                        { "kind": "block", "type": "dynamic_presence" },
+                        { "kind": "block", "type": "bot_status" },
+                        { "kind": "block", "type": "sharding_config" }
+                    ]
+                },
+                {
+                    "kind": "category", 
+                    "name": "⚡ Eventos", 
+                    "colour": "#00CEC9",
+                    "contents": [
+                        { "kind": "block", "type": "event_on_ready" },
+                        { "kind": "block", "type": "event_on_message" },
+                        { "kind": "block", "type": "event_on_message_edit" },
+                        { "kind": "block", "type": "event_on_message_delete" },
+                        { "kind": "block", "type": "event_on_bulk_delete" },
+                        { "kind": "block", "type": "event_member_join" },
+                        { "kind": "block", "type": "event_member_leave" },
+                        { "kind": "block", "type": "event_member_update" },
+                        { "kind": "block", "type": "event_reaction_add" },
+                        { "kind": "block", "type": "event_reaction_remove" },
+                        { "kind": "block", "type": "event_interaction" },
+                        { "kind": "block", "type": "event_guild_join" },
+                        { "kind": "block", "type": "event_guild_leave" },
+                        { "kind": "block", "type": "event_guild_update" },
+                        { "kind": "block", "type": "event_channel_create" },
+                        { "kind": "block", "type": "event_channel_delete" },
+                        { "kind": "block", "type": "event_channel_update" },
+                        { "kind": "block", "type": "event_voice_join" },
+                        { "kind": "block", "type": "event_voice_leave" },
+                        { "kind": "block", "type": "event_voice_mute" }
+                    ]
+                },
+                {
+                    "kind": "category", 
+                    "name": "💬 Mensajería", 
+                    "colour": "#FF7675",
+                    "contents": [
+                        { "kind": "block", "type": "send_simple_message" },
+                        { "kind": "block", "type": "create_embed" },
+                        { "kind": "block", "type": "embed_author" },
+                        { "kind": "block", "type": "embed_field" },
+                        { "kind": "block", "type": "embed_thumbnail" },
+                        { "kind": "block", "type": "embed_image" },
+                        { "kind": "block", "type": "embed_footer" },
+                        { "kind": "block", "type": "embed_timestamp" },
+                        { "kind": "block", "type": "send_file" },
+                        { "kind": "block", "type": "reaction_add" },
+                        { "kind": "block", "type": "message_reply" },
+                        { "kind": "block", "type": "message_edit" },
+                        { "kind": "block", "type": "message_delete" }
+                    ]
+                },
+                {
+                    "kind": "category", 
+                    "name": "🔘 Interacciones", 
+                    "colour": "#FF7675",
+                    "contents": [
+                        { "kind": "block", "type": "slash_command_creator" },
+                        { "kind": "block", "type": "interaction_reply" },
+                        { "kind": "block", "type": "button_create" },
+                        { "kind": "block", "type": "menu_string_select" },
+                        { "kind": "block", "type": "menu_user_select" },
+                        { "kind": "block", "type": "menu_role_select" },
+                        { "kind": "block", "type": "menu_channel_select" },
+                        { "kind": "block", "type": "menu_mentionable_select" },
+                        { "kind": "block", "type": "modal_create" },
+                        { "kind": "block", "type": "modal_text_input" }
+                    ]
+                },
+                {
+                    "kind": "category", 
+                    "name": "🛡️ Moderación", 
+                    "colour": "#E17055",
+                    "contents": [
+                        { "kind": "block", "type": "kick_member" },
+                        { "kind": "block", "type": "ban_member" },
+                        { "kind": "block", "type": "unban_member" },
+                        { "kind": "block", "type": "timeout_member" },
+                        { "kind": "block", "type": "nickname_change" },
+                        { "kind": "block", "type": "prune_messages" }
+                    ]
+                },
+                {
+                    "kind": "category", 
+                    "name": "👥 Miembros y Roles", 
+                    "colour": "#00B894",
+                    "contents": [
+                        { "kind": "block", "type": "role_create" },
+                        { "kind": "block", "type": "role_delete" },
+                        { "kind": "block", "type": "role_edit" },
+                        { "kind": "block", "type": "role_assign" },
+                        { "kind": "block", "type": "role_remove" },
+                        { "kind": "block", "type": "permission_check" }
+                    ]
+                },
+                {
+                    "kind": "category", 
+                    "name": "📂 Canales y Servidores", 
+                    "colour": "#F39C12",
+                    "contents": [
+                        { "kind": "block", "type": "channel_create" },
+                        { "kind": "block", "type": "channel_delete" },
+                        { "kind": "block", "type": "channel_edit" },
+                        { "kind": "block", "type": "channel_permission_lock" },
+                        { "kind": "block", "type": "channel_permission_hide" },
+                        { "kind": "block", "type": "thread_create" },
+                        { "kind": "block", "type": "thread_join" },
+                        { "kind": "block", "type": "thread_leave" },
+                        { "kind": "block", "type": "invite_create" },
+                        { "kind": "block", "type": "invite_delete" }
+                    ]
+                },
+                {
+                    "kind": "category", 
+                    "name": "🔊 Voz y Audio", 
+                    "colour": "#9B59B6",
+                    "contents": [
+                        { "kind": "block", "type": "voice_connect" },
+                        { "kind": "block", "type": "voice_disconnect" },
+                        { "kind": "block", "type": "voice_play" },
+                        { "kind": "block", "type": "voice_pause" },
+                        { "kind": "block", "type": "voice_resume" },
+                        { "kind": "block", "type": "voice_skip" },
+                        { "kind": "block", "type": "voice_volume" }
+                    ]
+                },
+                {
+                    "kind": "category", 
+                    "name": "📊 Datos (JSON)", 
+                    "colour": "#3498DB",
+                    "contents": [
+                        { "kind": "block", "type": "user_var_set" },
+                        { "kind": "block", "type": "user_var_get" },
+                        { "kind": "block", "type": "guild_var_set" },
+                        { "kind": "block", "type": "guild_var_get" },
+                        { "kind": "block", "type": "global_var_set" },
+                        { "kind": "block", "type": "global_var_get" }
+                    ]
+                },
+                {
+                    "kind": "category", 
+                    "name": "🔍 Obtener IDs y Nombres", 
+                    "colour": "#16A085",
+                    "contents": [
+                        { "kind": "block", "type": "get_channel_id" },
+                        { "kind": "block", "type": "get_channel_name" },
+                        { "kind": "block", "type": "get_role_id" },
+                        { "kind": "block", "type": "get_role_name" },
+                        { "kind": "block", "type": "get_user_id_numeric" },
+                        { "kind": "block", "type": "get_user_id_string" },
+                        { "kind": "block", "type": "get_user_mention" },
+                        { "kind": "block", "type": "get_user_name" },
+                        { "kind": "block", "type": "get_user_username" },
+                        { "kind": "block", "type": "get_guild_id_numeric" },
+                        { "kind": "block", "type": "get_guild_id_string" },
+                        { "kind": "block", "type": "get_guild_name" },
+                        { "kind": "block", "type": "get_message_author_id" },
+                        { "kind": "block", "type": "get_message_author_name" },
+                        { "kind": "block", "type": "get_interaction_user_id" },
+                        { "kind": "block", "type": "get_interaction_user_name" },
+                        { "kind": "block", "type": "get_member_id" },
+                        { "kind": "block", "type": "get_member_name" }
+                    ]
+                },
+                {
+                    "kind": "category", 
+                    "name": "⚙️ Lógica y Utilidades", 
+                    "colour": "#E67E22",
+                    "contents": [
+                        { "kind": "block", "type": "text_input" },
+                        { "kind": "block", "type": "number_input" },
+                        { "kind": "block", "type": "math_random" },
+                        { "kind": "block", "type": "math_operation" },
+                        { "kind": "block", "type": "logic_compare" },
+                        { "kind": "block", "type": "controls_if" },
+                        { "kind": "block", "type": "controls_if_elseif" },
+                        { "kind": "block", "type": "controls_if_else" },
+                        { "kind": "block", "type": "controls_repeat" },
+                        { "kind": "block", "type": "controls_for_each_member" },
+                        { "kind": "block", "type": "controls_for_each_guild" },
+                        { "kind": "block", "type": "wait_ms" },
+                        { "kind": "block", "type": "interval_execute" },
+                        { "kind": "block", "type": "api_request" }
+                    ]
+                }
+            ]
+        };
+
+        const workspace = Blockly.inject('blocklyDiv', {
+            toolbox: toolbox,
+            theme: Blockly.Themes.Classic,
+            renderer: 'zelos',
+            move: { scrollbars: true, drag: true, wheel: true },
+            zoom: { controls: false, wheel: true, startScale: 0.9 },
+            grid: { spacing: 40, length: 2, colour: '#E0E5EC', snap: true }
+        });
+
+        // Auto-insert non-deletable startup block if workspace is empty
+        if (workspace.getAllBlocks().length === 0) {
+            const xmlText = '<xml><block type="startup_block" x="20" y="20"><statement name="DO"></statement></block></xml>';
+            const xmlDom = Blockly.Xml.textToDom(xmlText);
+            Blockly.Xml.domToWorkspace(xmlDom, workspace);
+        }
+
+        function deploy() {
+            const code = javascript.javascriptGenerator.workspaceToCode(workspace);
+            if(!code) return alert("✨ Tu área de trabajo está vacía. ¡Añade bloques!");
+            
+            // Aquí escondemos el console.log para que el usuario no vea el código si no quiere
+            console.log("Desplegando lógica interna..."); 
+            alert("🚀 ¡Procesando tu bot! Se enviará a Pterodactyl en breve.");
+        }
+
+        window.addEventListener('resize', () => Blockly.svgResize(workspace));
+
+        // Autosave: throttle changes and persist XML to server
+        let saveTimeout = null;
+        const SAVE_DELAY = 2000;
+
+        function getProjectId(){
+            return localStorage.getItem('projectId');
+        }
+
+        // Project naming modal (hidden by default)
+        const modalHtml = `
+        <div id="nameModal" style="position:fixed;inset:0;display:none;align-items:center;justify-content:center;background:rgba(0,0,0,0.4);z-index:200">
+          <div style="background:white;padding:20px;border-radius:12px;min-width:320px;box-shadow:0 12px 40px rgba(2,6,23,0.2)">
+            <h3 style="margin:0 0 8px">Nombre del proyecto</h3>
+            <p style="margin:0 0 12px;color:#6b7280">Elige un nombre para tu bot. Será visible en el dashboard.</p>
+            <input id="projectNameInput" placeholder="Mi Bot Genial" style="width:100%;padding:10px;border-radius:8px;border:1px solid #e6e9ef;margin-bottom:12px" />
+            <div style="display:flex;gap:8px;justify-content:flex-end">
+              <button id="cancelNameBtn" style="background:#fff;border:1px solid #e6e9ef;padding:8px 12px;border-radius:8px">Cancelar</button>
+              <button id="confirmNameBtn" style="background:linear-gradient(135deg,#6C5CE7,#a29bfe);color:white;padding:8px 12px;border-radius:8px">Crear</button>
+            </div>
+          </div>
+        </div>`;
+        document.body.insertAdjacentHTML('beforeend', modalHtml);
+
+        // Project state
+        let currentProjectId = localStorage.getItem('projectId') || null;
+        let currentProjectName = 'Sin proyecto';
+
+        async function loadCurrentProject(){
+            if (!currentProjectId) return;
+            try{
+                const res = await fetch(`/api/projects/${currentProjectId}`);
+                if (!res.ok) { currentProjectId = null; localStorage.removeItem('projectId'); return; }
+                const p = await res.json();
+                currentProjectName = p.name || currentProjectName;
+                document.getElementById('projectNameHeader').textContent = currentProjectName;
+                if (p.xml){
+                    const xmlDom = Blockly.Xml.textToDom(p.xml);
+                    Blockly.Xml.domToWorkspace(xmlDom, workspace);
+                }
+            }catch(e){ console.warn('Failed load project', e.message); }
+        }
+
+        async function promptNewProject(){
+            const modal = document.getElementById('nameModal');
+            const input = document.getElementById('projectNameInput');
+            modal.style.display = 'flex'; input.value = '';
+            return new Promise((resolve)=>{
+                document.getElementById('cancelNameBtn').onclick = ()=>{ modal.style.display='none'; resolve(null); };
+                document.getElementById('confirmNameBtn').onclick = async ()=>{
+                    const name = input.value.trim() || ('Untitled '+Date.now());
+                    modal.style.display='none';
+                    // create project on server
+                    const r = await fetch('/api/projects', { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({ name }) });
+                    const body = await r.json();
+                    if (body && body.id){ currentProjectId = body.id; currentProjectName = body.name; localStorage.setItem('projectId', body.id); document.getElementById('projectNameHeader').textContent = currentProjectName; }
+                    resolve(body && body.id ? body.id : null);
+                };
+            });
+        }
+
+        document.getElementById('newProjectBtn').addEventListener('click', async ()=>{
+            await promptNewProject();
+        });
+
+        // Ensure project exists before autosave — prompt for name if needed
+        async function ensureProjectExists(){
+            if (currentProjectId) return currentProjectId;
+            const id = await promptNewProject();
+            return id;
+        }
+
+        async function saveXml(){
+            const id = await ensureProjectExists();
+            if (!id) return;
+            const xml = Blockly.Xml.domToText(Blockly.Xml.workspaceToDom(workspace));
+            try{
+                await fetch(`/api/project/${id}/xml`, { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({ xml }) });
+                console.debug('Autosaved project', id);
+            }catch(e){ console.warn('Autosave failed', e.message); }
+        }
+
+        function scheduleSave(){
+            if (saveTimeout) clearTimeout(saveTimeout);
+            saveTimeout = setTimeout(() => { saveXml(); saveTimeout = null; }, SAVE_DELAY);
+        }
+
+        workspace.addChangeListener((ev)=>{
+            // ignore UI-only events
+            if (ev.type === Blockly.Events.UI) return;
+            scheduleSave();
+        });
+
+        // Periodic backup
+        setInterval(()=>{ if (!saveTimeout) saveXml(); }, 30000);
+    </script>
+</body>
+</html>
