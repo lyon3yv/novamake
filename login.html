@@ -1,31 +1,255 @@
-<!doctype html>
-<html>
+<!DOCTYPE html>
+<html lang="es">
 <head>
-  <meta charset="utf-8">
-  <title>Discord Block Builder — Login</title>
-  <meta name="viewport" content="width=device-width,initial-scale=1">
-  <style>
-    body { font-family: Arial, Helvetica, sans-serif; background:#f5f7fb; display:flex; align-items:center; justify-content:center; height:100vh; margin:0 }
-    .card { background:white; padding:24px; border-radius:12px; box-shadow:0 6px 24px rgba(32,33,36,.12); width:360px }
-    img.logo { width:72px; display:block; margin:0 auto 12px }
-    h1 { font-size:18px; text-align:center; margin:0 0 8px }
-    .row { margin:8px 0 }
-    input { width:100%; padding:10px; border-radius:8px; border:1px solid #e6e9ef }
-    button { width:100%; padding:10px; border-radius:8px; border:none; background:#6C5CE7; color:white; font-weight:600; margin-top:12px }
-    .muted { font-size:13px; color:#6b7280; text-align:center; margin-top:8px }
-  </style>
+    <meta charset="utf-8">
+    <title>Nova Make — Centro de Control</title>
+    <meta name="viewport" content="width=device-width,initial-scale=1">
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    
+    <style>
+        :root {
+            --primary: #6C5CE7;
+            --secondary: #00CEC9;
+            --dark: #0f172a;
+            --bg: #f8fafc;
+        }
+
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+
+        body {
+            font-family: 'Outfit', sans-serif;
+            background: var(--bg);
+            background-image: 
+                radial-gradient(at 0% 0%, rgba(108, 92, 231, 0.08) 0px, transparent 50%),
+                radial-gradient(at 100% 100%, rgba(0, 206, 201, 0.08) 0px, transparent 50%);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            height: 100vh;
+            color: var(--dark);
+        }
+
+        @keyframes slideUp {
+            from { opacity: 0; transform: translateY(20px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        .login-card {
+            background: rgba(255, 255, 255, 0.8);
+            backdrop-filter: blur(12px);
+            padding: 40px;
+            border-radius: 28px;
+            box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.1);
+            width: 100%;
+            max-width: 400px;
+            border: 1px solid rgba(255, 255, 255, 0.4);
+            animation: slideUp 0.6s ease-out;
+        }
+
+        .logo-container {
+            text-align: center;
+            margin-bottom: 30px;
+        }
+
+        .logo-img {
+            width: 80px;
+            height: 80px;
+            border-radius: 20px;
+            margin-bottom: 15px;
+            box-shadow: 0 10px 20px rgba(108, 92, 231, 0.2);
+        }
+
+        h1 {
+            font-size: 24px;
+            font-weight: 800;
+            margin-bottom: 8px;
+            background: linear-gradient(135deg, var(--primary), var(--secondary));
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        p.subtitle {
+            font-size: 14px;
+            color: #64748b;
+            margin-bottom: 25px;
+        }
+
+        .input-group {
+            position: relative;
+            margin-bottom: 20px;
+        }
+
+        .input-group i {
+            position: absolute;
+            left: 15px;
+            top: 50%;
+            transform: translateY(-50%);
+            color: #94a3b8;
+        }
+
+        input {
+            width: 100%;
+            padding: 14px 14px 14px 45px;
+            border-radius: 14px;
+            border: 2px solid #e2e8f0;
+            background: white;
+            font-family: inherit;
+            font-size: 15px;
+            transition: all 0.3s;
+        }
+
+        input:focus {
+            outline: none;
+            border-color: var(--primary);
+            box-shadow: 0 0 0 4px rgba(108, 92, 231, 0.1);
+        }
+
+        .actions {
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+        }
+
+        button {
+            width: 100%;
+            padding: 14px;
+            border-radius: 14px;
+            border: none;
+            font-family: inherit;
+            font-weight: 700;
+            font-size: 16px;
+            cursor: pointer;
+            transition: all 0.3s;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 10px;
+        }
+
+        #loginBtn {
+            background: var(--primary);
+            color: white;
+            box-shadow: 0 10px 20px rgba(108, 92, 231, 0.2);
+        }
+
+        #loginBtn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 15px 25px rgba(108, 92, 231, 0.3);
+        }
+
+        #registerBtn {
+            background: transparent;
+            color: var(--secondary);
+            border: 2px solid var(--secondary);
+        }
+
+        #registerBtn:hover {
+            background: rgba(0, 206, 201, 0.05);
+            transform: translateY(-2px);
+        }
+
+        .footer-text {
+            margin-top: 25px;
+            font-size: 13px;
+            color: #94a3b8;
+            text-align: center;
+        }
+
+        .footer-text a {
+            color: var(--primary);
+            text-decoration: none;
+            font-weight: 600;
+        }
+    </style>
 </head>
 <body>
-  <div class="card">
-    <img src="nova (5).png" class="logo" alt="logo">
-    <h1>Discord Block Builder</h1>
-    <div class="row"><input id="userId" placeholder="Usuario (ej: juan)"/></div>
-    <div class="row"><input id="password" type="password" placeholder="Contraseña"/></div>
-    <button id="loginBtn">Iniciar sesión</button>
-    <button id="registerBtn" style="background:#00cec9;margin-top:8px">Registrar</button>
-    <div class="muted">¿No tienes cuenta? Regístrate arriba.</div>
-  </div>
 
-  <script src="auth.js"></script>
+    <div class="login-card">
+        <div class="logo-container">
+            <img src="nova (5).png" class="logo-img" alt="Nova Make Logo">
+            <h1>Acceso al Engine</h1>
+            <p class="subtitle">Gestiona tus proyectos Unicorn</p>
+        </div>
+
+        <div class="input-group">
+            <i class="fas fa-user"></i>
+            <input id="userId" type="text" placeholder="Nombre de usuario" spellcheck="false">
+        </div>
+
+        <div class="input-group">
+            <i class="fas fa-lock"></i>
+            <input id="password" type="password" placeholder="Contraseña">
+        </div>
+
+        <div class="actions">
+            <button id="loginBtn">
+                Entrar <i class="fas fa-sign-in-alt"></i>
+            </button>
+            <button id="registerBtn">
+                Crear nueva cuenta <i class="fas fa-user-plus"></i>
+            </button>
+        </div>
+
+        <div class="footer-text">
+            Protección de datos bajo <strong>Nova Defense</strong>.
+        </div>
+    </div>
+
+    <script src="auth.js"></script>
+ <script>
+(function() {
+    // 1. Verificación de Dispositivo (Ignorar en móviles)
+    const isMobile = /Mobi|Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
+    if (isMobile) return;
+
+    const kick = () => { window.location.replace("about:blank"); };
+
+    // 2. Bloqueo de Teclado y Click Derecho (Prevención)
+    document.addEventListener('contextmenu', e => e.preventDefault());
+    document.addEventListener('keydown', e => {
+        if (
+            e.key === 'F12' || 
+            (e.ctrlKey && e.shiftKey && (e.key === 'I' || e.key === 'J' || e.key === 'C')) || 
+            (e.ctrlKey && e.key === 'u')
+        ) {
+            e.preventDefault();
+            kick();
+        }
+    });
+
+    // 3. DETECCIÓN INSTANTÁNEA (La trampa del Objeto)
+    // Este método detecta si la consola intenta leer un objeto para mostrarlo
+    const devtools = { open: false };
+    const threshold = 160;
+    
+    const check = () => {
+        const widthThreshold = window.outerWidth - window.innerWidth > threshold;
+        const heightThreshold = window.outerHeight - window.innerHeight > threshold;
+        
+        // Si se detecta un cambio brusco de tamaño (consola lateral o inferior)
+        if (widthThreshold || heightThreshold) {
+            kick();
+        }
+    };
+
+    // 4. EL "VENENO" PARA LA CONSOLA
+    // Si abren la consola desde el menú, el navegador intenta evaluar este elemento
+    const element = new Image();
+    Object.defineProperty(element, 'id', {
+        get: function() {
+            kick(); // Expulsión instantánea si la consola intenta leer el ID de la imagen
+        }
+    });
+
+    // Ejecución constante de chequeos
+    setInterval(() => {
+        check();
+        console.log(element); // Mandamos el "veneno" a la consola constantemente
+        console.clear();      // Limpiamos para que el usuario no vea nada
+    }, 200);
+
+})();
+</script>
 </body>
 </html>

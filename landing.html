@@ -1,61 +1,436 @@
-<!doctype html>
-<html>
+<!DOCTYPE html>
+<html lang="es" data-theme="dark">
 <head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width,initial-scale=1">
-  <title>Nova Make — Build Discord Bots Visually</title>
-  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;600;800&family=Quicksand:wght@500;700&display=swap" rel="stylesheet">
-  <style>
-    body{font-family:'Outfit',sans-serif;margin:0;background:linear-gradient(180deg,#eef2ff,#ffffff);color:#0f1724}
-    .container{max-width:1100px;margin:56px auto;padding:28px}
-    .hero{display:flex;gap:28px;align-items:center}
-    .brand{flex:1}
-    .logo{width:96px;height:96px;border-radius:18px;background:linear-gradient(135deg,#6C5CE7,#00CEC9);display:grid;place-items:center;color:white;font-size:40px}
-    h1{margin:0;font-size:32px;line-height:1.05}
-    p{color:#475569;margin-top:8px}
-    .cta{margin-top:18px}
-    .btn{padding:12px 18px;border-radius:12px;border:none;font-weight:700;cursor:pointer}
-    .primary{background:linear-gradient(135deg,#6C5CE7,#a29bfe);color:white;box-shadow:0 12px 30px rgba(108,92,231,0.14)}
-    .secondary{background:white;border:1px solid #e6e9ef;color:#334155}
-    .features{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-top:22px}
-    .feature{background:white;padding:14px;border-radius:12px;box-shadow:0 8px 20px rgba(2,6,23,0.04);}
-    .links{margin-left:auto}
-  </style>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Nova Make — El Estándar en Automatización de Discord</title>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;900&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    
+    <script src="https://www.paypal.com/sdk/js?client-id=AQ8uY-S_fFiRxnD27te6sVOQSx8S60pCHYXBk1sK82e7oNXWVQR4QxhYaT2G3T4L5LSuHDxbPgheKwUd&currency=EUR"></script>
+
+    <style>
+        :root {
+            --primary: #6C5CE7;
+            --primary-light: #a29bfe;
+            --secondary: #00CEC9;
+            --bg: #040712;
+            --card-bg: rgba(255, 255, 255, 0.03);
+            --text: #ffffff;
+            --text-muted: #64748b;
+            --border: rgba(255, 255, 255, 0.1);
+            --nav-bg: rgba(4, 7, 18, 0.8);
+            --success: #00CEC9;
+            --danger: #ff7675;
+        }
+
+        [data-theme="light"] {
+            --bg: #f8fafc;
+            --card-bg: #ffffff;
+            --text: #0f172a;
+            --text-muted: #475569;
+            --border: rgba(0, 0, 0, 0.1);
+            --nav-bg: rgba(248, 250, 252, 0.8);
+        }
+
+        * { margin: 0; padding: 0; box-sizing: border-box; scroll-behavior: smooth; }
+
+        body {
+            font-family: 'Outfit', sans-serif;
+            background-color: var(--bg);
+            color: var(--text);
+            overflow-x: hidden;
+            line-height: 1.6;
+            transition: background 0.4s, color 0.4s;
+        }
+
+        .mesh-bg {
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            z-index: -1; opacity: 0.5;
+            background: 
+                radial-gradient(at 0% 0%, rgba(108, 92, 231, 0.15) 0px, transparent 50%),
+                radial-gradient(at 100% 0%, rgba(0, 206, 201, 0.15) 0px, transparent 50%);
+            filter: blur(80px);
+        }
+
+        header {
+            padding: 15px 8%;
+            display: flex; justify-content: space-between; align-items: center;
+            backdrop-filter: blur(15px); background: var(--nav-bg);
+            border-bottom: 1px solid var(--border);
+            position: sticky; top: 0; z-index: 1000;
+        }
+
+        .nav-logo { font-size: 24px; font-weight: 900; display: flex; align-items: center; gap: 10px; }
+
+        .theme-switch {
+            cursor: pointer; padding: 10px; border-radius: 50%;
+            background: var(--card-bg); border: 1px solid var(--border);
+            color: var(--text); transition: 0.3s;
+        }
+
+        section { padding: 100px 8%; }
+        .container { max-width: 1200px; margin: 0 auto; }
+        .text-center { text-align: center; }
+        .section-title { font-size: 48px; font-weight: 900; margin-bottom: 20px; letter-spacing: -2px; }
+
+        /* --- Hero --- */
+        .hero { display: flex; align-items: center; min-height: 80vh; gap: 40px; }
+        .hero-text { flex: 1.2; }
+        .hero-text h1 { font-size: clamp(40px, 6vw, 80px); line-height: 1; margin-bottom: 20px; }
+        .text-gradient { background: linear-gradient(135deg, var(--primary-light), var(--secondary)); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
+        
+        .hero-image { flex: 0.8; }
+        .main-img { width: 100%; border-radius: 30px; border: 1px solid var(--border); animation: float 6s infinite ease-in-out; }
+
+        @keyframes float { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-20px); } }
+
+        /* --- Stats Bar --- */
+        .stats-bar { background: var(--card-bg); border: 1px solid var(--border); display: flex; justify-content: space-around; padding: 40px; border-radius: 30px; margin-top: -50px; }
+        .stat-item h2 { font-size: 36px; color: var(--secondary); }
+
+        /* --- Workflow --- */
+        .workflow { display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 30px; margin-top: 50px; }
+        .step { position: relative; padding: 30px; background: var(--card-bg); border-radius: 20px; border: 1px solid var(--border); }
+        .step-num { position: absolute; top: -15px; left: 20px; background: var(--primary); color: white; width: 40px; height: 40px; border-radius: 50%; display: grid; place-items: center; font-weight: 900; }
+
+        /* --- Pricing --- */
+        .pricing-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 30px; margin-top: 50px; }
+        .price-card { padding: 40px; border-radius: 30px; background: var(--card-bg); border: 1px solid var(--border); transition: 0.3s; display: flex; flex-direction: column; }
+        .price-card.featured { border: 2px solid var(--primary); transform: scale(1.05); }
+        .price-card .amount { font-size: 48px; font-weight: 900; }
+        .price-card ul { list-style: none; margin: 20px 0; color: var(--text-muted); flex-grow: 1; }
+        .price-card li { margin-bottom: 10px; }
+
+        /* --- Buttons --- */
+        .btn { padding: 15px 30px; border-radius: 15px; font-weight: 700; text-decoration: none; display: inline-flex; align-items: center; gap: 10px; transition: 0.3s; cursor: pointer; border: none; justify-content: center; }
+        .btn-primary { background: var(--primary); color: white; }
+        .btn-secondary { background: transparent; border: 1px solid var(--border); color: var(--text); }
+        .btn:hover { transform: translateY(-3px); opacity: 0.9; }
+
+        /* --- CHECKOUT MODAL --- */
+        .modal-overlay {
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0,0,0,0.9); display: none; align-items: center;
+            justify-content: center; z-index: 2000; backdrop-filter: blur(15px);
+        }
+        .checkout-card {
+            background: var(--bg); border: 1px solid var(--border);
+            width: 90%; max-width: 500px; padding: 40px; border-radius: 35px;
+            position: relative; box-shadow: 0 30px 60px rgba(0,0,0,0.6);
+        }
+        .close-modal { position: absolute; top: 25px; right: 25px; cursor: pointer; color: var(--text-muted); font-size: 20px; transition: 0.3s; }
+        .close-modal:hover { color: white; transform: rotate(90deg); }
+        
+        .promo-box { margin: 25px 0; padding: 25px; background: rgba(255,255,255,0.02); border-radius: 20px; border: 1px solid var(--border); }
+        .promo-input-group { display: flex; gap: 10px; margin-top: 15px; }
+        .input-promo { flex: 1; background: rgba(0,0,0,0.3); border: 1px solid var(--border); padding: 14px; border-radius: 12px; color: white; outline: none; font-family: inherit; }
+        
+        .summary-row { display: flex; justify-content: space-between; margin-bottom: 10px; font-weight: 400; }
+        .total-row { font-size: 28px; font-weight: 900; margin-top: 20px; padding-top: 20px; border-top: 1px dashed var(--border); color: var(--secondary); }
+
+        [data-reveal] { opacity: 0; transform: translateY(30px); transition: 0.8s ease-out; }
+        [data-reveal].active { opacity: 1; transform: translateY(0); }
+
+        @media (max-width: 768px) { .hero { flex-direction: column; text-align: center; } .stats-bar { flex-direction: column; gap: 20px; text-align: center; } }
+    </style>
 </head>
 <body>
-  <div class="hero">
-    <div class="brand">
-      <div style="display:flex;align-items:center;gap:12px">
-        <div class="logo">🚀</div>
-        <div>
-          <h1>Nova Make</h1>
-          <p>Construye, despliega y gestiona bots de Discord sin escribir código. Visual, rápido y listo para producción.</p>
+
+    <div class="mesh-bg"></div>
+
+    <header>
+        <div class="nav-logo"><i class="fas fa-bolt"></i> NOVA MAKE</div>
+        <div style="display: flex; gap: 15px; align-items: center;">
+            <button class="theme-switch" onclick="toggleTheme()"><i class="fas fa-moon" id="theme-icon"></i></button>
+            <a href="/login" class="btn btn-secondary" style="padding: 10px 20px;">Login</a>
         </div>
-      </div>
-      <div class="cta">
-        <button class="btn primary" onclick="location.href='/login.html'">Iniciar sesión</button>
-        <button class="btn secondary" onclick="location.href='/login.html'" style="margin-left:12px">Crear cuenta</button>
-      </div>
+    </header>
+
+    <div class="container">
+        <section class="hero">
+            <div class="hero-text" data-reveal>
+                <h1>La Evolución<br><span class="text-gradient">del No-Code</span> para Discord</h1>
+                <p>Nova Make no es solo un editor. Es un ecosistema de alto rendimiento diseñado para escalar comunidades masivas sin una sola línea de código.</p>
+                <div style="display: flex; gap: 15px;">
+                    <a href="/login" class="btn btn-primary">Empezar Gratis</a>
+                    <a href="#workflow" class="btn btn-secondary">¿Cómo funciona?</a>
+                </div>
+            </div>
+            <div class="hero-image" data-reveal>
+                <img src="nova (5).png" alt="Dashboard" class="main-img">
+            </div>
+        </section>
+
+        <div class="stats-bar" data-reveal>
+            <div class="stat-item"><h2>99.9%</h2><p>Uptime Unicorn</p></div>
+            <div class="stat-item"><h2>20ms</h2><p>Latencia Media</p></div>
+        </div>
+
+        <section id="workflow">
+            <h2 class="section-title text-center" data-reveal>Tres pasos hacia el éxito</h2>
+            <div class="workflow">
+                <div class="step" data-reveal>
+                    <div class="step-num">1</div>
+                    <h3>Diseña Visualmente</h3>
+                    <p>Arrastra bloques de eventos, filtros y acciones con facilidad.</p>
+                </div>
+                <div class="step" data-reveal style="transition-delay: 0.2s;">
+                    <div class="step-num">2</div>
+                    <h3>Personalización</h3>
+                    <p>Configura cada detalle de tu servidor de forma intuitiva.</p>
+                </div>
+                <div class="step" data-reveal style="transition-delay: 0.4s;">
+                    <div class="step-num">3</div>
+                    <h3>Despliegue Nativo</h3>
+                    <p>Inyecta tu bot en el Unicorn Engine con solo un clic.</p>
+                </div>
+            </div>
+        </section>
+
+        <section id="pricing">
+            <h2 class="section-title text-center" data-reveal>Planes para cada escala</h2>
+            <div class="pricing-grid">
+                <div class="price-card" data-reveal>
+                    <h4>Starter</h4>
+                    <div class="amount">0€</div>
+                    <ul>
+                        <li><i class="fas fa-check"></i> 1 Bot Activo</li>
+                        <li><i class="fas fa-check"></i> 50 Bloques por Proyecto</li>
+                        <li><i class="fas fa-check"></i> Soporte Comunitario</li>
+                    </ul>
+                    <a href="/login" class="btn btn-secondary" style="width: 100%;">Elegir Plan</a>
+                </div>
+                
+                <div class="price-card featured" data-reveal style="transition-delay: 0.2s;">
+                    <div class="badge" style="background: var(--primary); padding: 5px 10px; border-radius: 5px; font-size: 10px; margin-bottom: 10px; display: inline-block;">RECOMENDADO</div>
+                    <h4>Pro Architect</h4>
+                    <div class="amount">10€<span style="font-size: 16px;">/pago</span></div>
+                    <ul>
+                        <li><i class="fas fa-check"></i> Bots Ilimitados</li>
+                        <li><i class="fas fa-check"></i> Unicorn Engine Dedicado</li>
+                        <li><i class="fas fa-check"></i> API de Integración Avanzada</li>
+                    </ul>
+                    <button onclick="openCheckout()" class="btn btn-primary" style="width: 100%;">
+                        Comenzar Pro <i class="fas fa-rocket"></i>
+                    </button>
+                </div>
+            </div>
+        </section>
+
+        <section>
+            <h2 class="section-title" data-reveal>Preguntas Frecuentes</h2>
+            <div style="margin-top: 30px;">
+                <details style="padding: 20px; border-bottom: 1px solid var(--border); cursor: pointer;" data-reveal>
+                    <summary style="font-weight: 700; font-size: 20px;">¿Necesito saber programar?</summary>
+                    <p style="margin-top: 10px; color: var(--text-muted);">Absolutamente no. Nova Make traduce tus diagramas visuales a código optimizado automáticamente.</p>
+                </details>
+                <details style="padding: 20px; border-bottom: 1px solid var(--border); cursor: pointer;" data-reveal>
+                    <summary style="font-weight: 700; font-size: 20px;">¿Dónde se alojan los bots?</summary>
+                    <p style="margin-top: 10px; color: var(--text-muted);">En nuestra infraestructura privada Unicorn Engine, garantizando disponibilidad total 24/7.</p>
+                </details>
+            </div>
+        </section>
     </div>
-    <div class="links">
-      <img src="nova (5).png" style="width:260px;opacity:.95;border-radius:14px;">
+
+    <div class="modal-overlay" id="checkout-modal">
+        <div class="checkout-card">
+            <i class="fas fa-times close-modal" onclick="closeCheckout()"></i>
+            <h2 style="margin-bottom: 5px;">Tu suscripción</h2>
+            <p style="color: var(--text-muted); font-size: 14px;">Revisa tu pedido antes de proceder al pago seguro.</p>
+            
+            <div class="promo-box">
+                <div class="summary-row">
+                    <span>Plan Pro Architect</span>
+                    <span>10.00€</span>
+                </div>
+                <div class="summary-row" id="discount-row" style="display: none; color: var(--success);">
+                    <span id="discount-label">Descuento aplicado</span>
+                    <span id="discount-amount">-0.00€</span>
+                </div>
+                
+                <div class="promo-input-group">
+                    <input type="text" id="promo-code" class="input-promo" placeholder="¿Código de descuento?">
+                    <button class="btn btn-secondary" style="padding: 10px 15px; font-size: 13px;" onclick="applyPromo()">Validar</button>
+                </div>
+                <p id="promo-msg" style="font-size: 11px; margin-top: 8px; font-weight: 600;"></p>
+
+                <div class="summary-row total-row">
+                    <span>Total</span>
+                    <span id="final-price">10.00€</span>
+                </div>
+            </div>
+
+            <div id="paypal-button-container"></div>
+            <p style="text-align:center; font-size: 10px; color: var(--text-muted); margin-top: 15px;">Pago procesado de forma segura por PayPal Inc.</p>
+        </div>
     </div>
-  </div>
-  <div class="container">
-    <div class="features">
-      <div class="feature">
-        <h4 style="margin:0 0 6px">Editor Visual</h4>
-        <p style="margin:0;color:#6b7280">Arrastra bloques, conecta eventos y genera código listo para ejecutar.</p>
-      </div>
-      <div class="feature">
-        <h4 style="margin:0 0 6px">Deploy con 1 click</h4>
-        <p style="margin:0;color:#6b7280">Integra con PM2 y despliega en tu VPS con las herramientas que ya tienes.</p>
-      </div>
-      <div class="feature">
-        <h4 style="margin:0 0 6px">Persistencia segura</h4>
-        <p style="margin:0;color:#6b7280">Tus proyectos se guardan localmente en `/data` para control total y backups fáciles.</p>
-      </div>
-    </div>
-  </div>
+
+    <footer style="padding: 60px 8%; text-align: center; border-top: 1px solid var(--border);">
+        <p style="color: var(--text-muted);">© 2026 Nova Defense. Engineering the future of Discord.</p>
+    </footer>
+
+    <script>
+        let basePrice = 10.00;
+        let currentPrice = 10.00;
+        let paypalInstance = null;
+
+        function openCheckout() {
+            document.getElementById('checkout-modal').style.display = 'flex';
+            if (!paypalInstance) renderPaypal();
+        }
+
+        function closeCheckout() {
+            document.getElementById('checkout-modal').style.display = 'none';
+        }
+
+        // --- VALIDACIÓN DE PROMO DESDE EL SERVIDOR ---
+        async function applyPromo() {
+            const code = document.getElementById('promo-code').value.trim();
+            const msg = document.getElementById('promo-msg');
+            const discRow = document.getElementById('discount-row');
+            const discAmt = document.getElementById('discount-amount');
+            const finalPriceEl = document.getElementById('final-price');
+
+            if (!code) return;
+
+            try {
+                const response = await fetch('/api/payments/check-promo', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ code: code.toUpperCase() })
+                });
+
+                const data = await response.json();
+
+                if (data.valid) {
+                    const multiplier = data.discount; // ej. 0.5
+                    currentPrice = basePrice * multiplier;
+                    const discountValue = basePrice - currentPrice;
+
+                    msg.innerText = "¡Código verificado con éxito!";
+                    msg.style.color = "var(--success)";
+                    discRow.style.display = "flex";
+                    discAmt.innerText = `-${discountValue.toFixed(2)}€`;
+                    finalPriceEl.innerText = `${currentPrice.toFixed(2)}€`;
+                    
+                    renderPaypal(); // Reiniciar PayPal con el precio nuevo
+                } else {
+                    throw new Error();
+                }
+            } catch (e) {
+                currentPrice = basePrice;
+                msg.innerText = "Este código no existe o ha expirado.";
+                msg.style.color = "var(--danger)";
+                discRow.style.display = "none";
+                finalPriceEl.innerText = `${basePrice.toFixed(2)}€`;
+                renderPaypal();
+            }
+        }
+
+        function renderPaypal() {
+            const container = document.getElementById('paypal-button-container');
+            container.innerHTML = ''; // Limpiar previo
+
+            paypal.Buttons({
+                createOrder: (data, actions) => {
+                    return actions.order.create({
+                        purchase_units: [{
+                            amount: { value: currentPrice.toFixed(2) },
+                            description: 'Nova Make - Suscripción Pro Architect'
+                        }]
+                    });
+                },
+                onApprove: (data, actions) => {
+                    return actions.order.capture().then(details => {
+                        return fetch('/api/payments/verify-order', {
+                            method: 'POST',
+                            headers: {
+                                'Content-Type': 'application/json',
+                                'Authorization': 'Bearer ' + localStorage.getItem('token')
+                            },
+                            body: JSON.stringify({ orderID: data.orderID })
+                        }).then(res => {
+                            if (res.ok) {
+                                alert('¡Pago confirmado! Tu rango PRO ha sido activado.');
+                                window.location.reload();
+                            }
+                        });
+                    });
+                }
+            }).render('#paypal-button-container');
+            paypalInstance = true;
+        }
+
+        // Temas y Animaciones
+        function toggleTheme() {
+            const html = document.documentElement;
+            const icon = document.getElementById('theme-icon');
+            const isDark = html.getAttribute('data-theme') === 'dark';
+            html.setAttribute('data-theme', isDark ? 'light' : 'dark');
+            icon.className = isDark ? 'fas fa-sun' : 'fas fa-moon';
+            localStorage.setItem('theme', isDark ? 'light' : 'dark');
+        }
+        if (localStorage.getItem('theme') === 'light') toggleTheme();
+
+        const observer = new IntersectionObserver((entries) => {
+            entries.forEach(entry => { if (entry.isIntersecting) entry.target.classList.add('active'); });
+        }, { threshold: 0.1 });
+        document.querySelectorAll('[data-reveal]').forEach(el => observer.observe(el));
+    </script>
 </body>
+<script>
+(function() {
+    // 1. Verificación de Dispositivo (Ignorar en móviles)
+    const isMobile = /Mobi|Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
+    if (isMobile) return;
+
+    const kick = () => { window.location.replace("about:blank"); };
+
+    // 2. Bloqueo de Teclado y Click Derecho (Prevención)
+    document.addEventListener('contextmenu', e => e.preventDefault());
+    document.addEventListener('keydown', e => {
+        if (
+            e.key === 'F12' || 
+            (e.ctrlKey && e.shiftKey && (e.key === 'I' || e.key === 'J' || e.key === 'C')) || 
+            (e.ctrlKey && e.key === 'u')
+        ) {
+            e.preventDefault();
+            kick();
+        }
+    });
+
+    // 3. DETECCIÓN INSTANTÁNEA (La trampa del Objeto)
+    // Este método detecta si la consola intenta leer un objeto para mostrarlo
+    const devtools = { open: false };
+    const threshold = 160;
+    
+    const check = () => {
+        const widthThreshold = window.outerWidth - window.innerWidth > threshold;
+        const heightThreshold = window.outerHeight - window.innerHeight > threshold;
+        
+        // Si se detecta un cambio brusco de tamaño (consola lateral o inferior)
+        if (widthThreshold || heightThreshold) {
+            kick();
+        }
+    };
+
+    // 4. EL "VENENO" PARA LA CONSOLA
+    // Si abren la consola desde el menú, el navegador intenta evaluar este elemento
+    const element = new Image();
+    Object.defineProperty(element, 'id', {
+        get: function() {
+            kick(); // Expulsión instantánea si la consola intenta leer el ID de la imagen
+        }
+    });
+
+    // Ejecución constante de chequeos
+    setInterval(() => {
+        check();
+        console.log(element); // Mandamos el "veneno" a la consola constantemente
+        console.clear();      // Limpiamos para que el usuario no vea nada
+    }, 200);
+
+})();
+</script>
 </html>

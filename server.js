@@ -4,283 +4,253 @@ const fs = require('fs');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const { spawn } = require('child_process');
+const https = require('https');
+require('dotenv').config();
+
 const app = express();
 
-app.use(express.json());
-app.use(express.static('.'));
+// --- CONFIGURACIÓN ---
+const JWT_SECRET = process.env.JWT_SECRET || 'nova_ultra_secret_safe_2026';
+const PAYPAL_CLIENT_ID = 'AQ8uY-S_fFiRxnD27te6sVOQSx8S60pCHYXBk1sK82e7oNXWVQR4QxhYaT2G3T4L5LSuHDxbPgheKwUd';
+const PAYPAL_SECRET = process.env.PAYPAL_SECRET; 
+const PORT = 3000;
 
-// Ensure data directory and required JSON files exist (VPS-friendly, relative paths)
+app.use(express.json());
+app.use(express.urlencoded({ extended: true }));
+
+// --- INFRAESTRUCTURA DE DATOS ---
 const dataDir = path.join(__dirname, 'data');
+const botsDir = path.join(dataDir, 'bots');
 const requiredFiles = ['users.json', 'projects.json', 'guilds.json', 'global.json'];
 
-// Bot process registry (in-memory)
-const botProcesses = {};
-
-// JWT secret (override with env var in production)
-const JWT_SECRET = process.env.JWT_SECRET || 'dev_secret_change_me';
-
 function ensureDataInfrastructure() {
-    try {
-        if (!fs.existsSync(dataDir)) {
-            fs.mkdirSync(dataDir, { recursive: true, mode: 0o755 });
-            console.log('Created data directory:', dataDir);
-        }
-
-        requiredFiles.forEach((file) => {
-            const filePath = path.join(dataDir, file);
-            if (!fs.existsSync(filePath)) {
-                fs.writeFileSync(filePath, '{}', { mode: 0o644 });
-                console.log('Created data file:', filePath);
-            } else {
-                // Make sure file is not empty and has correct permissions where possible
-                try {
-                    const stats = fs.statSync(filePath);
-                    if (stats.size === 0) fs.writeFileSync(filePath, '{}', { mode: 0o644 });
-                    try { fs.chmodSync(filePath, 0o644); } catch (e) { /* noop on some platforms */ }
-                } catch (e) {
-                    console.warn('Warning checking file', filePath, e.message);
-                }
-            }
-        });
-    } catch (err) {
-        console.error('Failed to ensure data infrastructure:', err);
-        process.exit(1);
-    }
+    if (!fs.existsSync(dataDir)) fs.mkdirSync(dataDir, { recursive: true });
+    if (!fs.existsSync(botsDir)) fs.mkdirSync(botsDir, { recursive: true });
+    requiredFiles.forEach(file => {
+        const filePath = path.join(dataDir, file);
+        if (!fs.existsSync(filePath)) fs.writeFileSync(filePath, '{}');
+    });
 }
-
-// Initialize data files before server starts
 ensureDataInfrastructure();
 
-// Simple CORS for editor/dashboard usage (adjust in production)
-app.use((req, res, next) => {
-    res.setHeader('Access-Control-Allow-Origin', '*');
-    res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
-    res.setHeader('Access-Control-Allow-Methods', 'GET,POST,PUT,DELETE,OPTIONS');
-    if (req.method === 'OPTIONS') return res.sendStatus(200);
-    next();
-});
-
-// Helper utilities for reading/writing JSON files in the data directory
-function readJSON(filename) {
-    const filePath = path.join(dataDir, filename);
-    try {
-        const raw = fs.readFileSync(filePath, 'utf8');
-        return raw.trim() ? JSON.parse(raw) : {};
-    } catch (err) {
-        console.warn('readJSON error', filePath, err.message);
-        return {};
-    }
+// --- HELPERS ---
+function readJSON(file) {
+    try { return JSON.parse(fs.readFileSync(path.join(dataDir, file), 'utf8') || '{}'); }
+    catch (e) { return {}; }
+}
+function writeJSON(file, data) {
+    fs.writeFileSync(path.join(dataDir, file), JSON.stringify(data, null, 2));
 }
 
-function writeJSON(filename, obj) {
-    const filePath = path.join(dataDir, filename);
+function authMiddleware(req, res, next) {
+    const auth = req.headers.authorization;
+    const token = auth && auth.startsWith('Bearer ') ? auth.split(' ')[1] : null;
+    if (!token) return res.status(401).json({ error: 'Inicia sesión' });
     try {
-        fs.writeFileSync(filePath, JSON.stringify(obj, null, 2), { mode: 0o644 });
-        return true;
-    } catch (err) {
-        console.error('writeJSON error', filePath, err.message);
-        return false;
-    }
+        req.user = jwt.verify(token, JWT_SECRET);
+        next();
+    } catch (err) { res.status(401).json({ error: 'Sesión expirada' }); }
 }
 
-// Projects endpoints
-app.get('/api/projects', authMiddleware, (req, res) => {
-    const projects = readJSON('projects.json');
-    res.json(projects);
-});
+// --- PAYPAL ACCESS TOKEN ---
+async function getPayPalAccessToken() {
+    const auth = Buffer.from(`${PAYPAL_CLIENT_ID}:${PAYPAL_SECRET}`).toString('base64');
+    const response = await fetch('https://api-m.paypal.com/v1/oauth2/token', {
+        method: 'POST',
+        body: 'grant_type=client_credentials',
+        headers: { Authorization: `Basic ${auth}`, 'Content-Type': 'application/x-www-form-urlencoded' }
+    });
+    const data = await response.json();
+    return data.access_token;
+}
 
-app.get('/api/projects/:id', authMiddleware, (req, res) => {
-    const projects = readJSON('projects.json');
-    const id = req.params.id;
-    if (!projects[id]) return res.status(404).json({ error: 'Project not found' });
-    res.json(projects[id]);
-});
+// --- RUTAS DE PÁGINAS ---
+app.get('/', (req, res) => res.sendFile(path.join(__dirname, 'landing.html')));
+app.get('/login', (req, res) => res.sendFile(path.join(__dirname, 'login.html')));
+app.get('/editor', (req, res) => res.sendFile(path.join(__dirname, 'index.html')));
+app.get('/dashboard', (req, res) => res.sendFile(path.join(__dirname, 'dashboard.html')));
 
-app.post('/api/projects', authMiddleware, (req, res) => {
-    const { id, name, xml, meta } = req.body;
-    const projects = readJSON('projects.json');
-    const projectId = id || Date.now().toString();
-    projects[projectId] = { id: projectId, name: name || `Project ${projectId}`, xml: xml || '', code: req.body.code || '', meta: meta || {}, updatedAt: new Date().toISOString() };
-    if (!writeJSON('projects.json', projects)) return res.status(500).json({ error: 'Failed to save project' });
-    res.json(projects[projectId]);
-});
-
-// Update project (xml / code / name)
-app.put('/api/projects/:id', authMiddleware, (req, res) => {
-    const id = req.params.id;
-    const { name, xml, code, meta } = req.body;
-    const projects = readJSON('projects.json');
-    if (!projects[id]) return res.status(404).json({ error: 'Project not found' });
-    if (name !== undefined) projects[id].name = name;
-    if (xml !== undefined) projects[id].xml = xml;
-    if (code !== undefined) projects[id].code = code;
-    if (meta !== undefined) projects[id].meta = meta;
-    projects[id].updatedAt = new Date().toISOString();
-    if (!writeJSON('projects.json', projects)) return res.status(500).json({ error: 'Failed to update project' });
-    res.json(projects[id]);
-});
-
-app.delete('/api/projects/:id', authMiddleware, (req, res) => {
-    const projects = readJSON('projects.json');
-    const id = req.params.id;
-    if (!projects[id]) return res.status(404).json({ error: 'Project not found' });
-    delete projects[id];
-    if (!writeJSON('projects.json', projects)) return res.status(500).json({ error: 'Failed to delete project' });
-    res.json({ ok: true });
-});
-
-// Simple user endpoints
-app.get('/api/users', (req, res) => {
-    const users = readJSON('users.json');
-    res.json(users);
-});
-
-app.post('/api/users', (req, res) => {
-    const { id, data } = req.body;
-    if (!id) return res.status(400).json({ error: 'Missing id' });
-    const users = readJSON('users.json');
-    users[id] = data || {};
-    if (!writeJSON('users.json', users)) return res.status(500).json({ error: 'Failed to save user' });
-    res.json(users[id]);
-});
-
-// --- Authentication endpoints ---
+// --- API AUTH ---
 app.post('/api/auth/register', (req, res) => {
     const { id, password } = req.body;
-    if (!id || !password) return res.status(400).json({ error: 'Missing id or password' });
     const users = readJSON('users.json');
-    if (users[id]) return res.status(409).json({ error: 'User exists' });
-    const hash = bcrypt.hashSync(password, 8);
-    users[id] = { id, passwordHash: hash, createdAt: new Date().toISOString() };
-    if (!writeJSON('users.json', users)) return res.status(500).json({ error: 'Failed to save user' });
-    const token = jwt.sign({ id }, JWT_SECRET, { expiresIn: '7d' });
-    res.json({ id, token });
+    if (users[id]) return res.status(400).json({ error: 'Usuario ya existe' });
+    users[id] = { id, passwordHash: bcrypt.hashSync(password, 8), createdAt: new Date(), role: 'free' };
+    writeJSON('users.json', users);
+    res.json({ token: jwt.sign({ id }, JWT_SECRET, { expiresIn: '7d' }), role: 'free' });
 });
 
 app.post('/api/auth/login', (req, res) => {
     const { id, password } = req.body;
-    if (!id || !password) return res.status(400).json({ error: 'Missing id or password' });
     const users = readJSON('users.json');
     const user = users[id];
-    if (!user) return res.status(404).json({ error: 'User not found' });
-    if (!bcrypt.compareSync(password, user.passwordHash)) return res.status(401).json({ error: 'Invalid credentials' });
-    const token = jwt.sign({ id }, JWT_SECRET, { expiresIn: '7d' });
-    res.json({ id, token });
+    if (!user || !bcrypt.compareSync(password, user.passwordHash)) return res.status(401).json({ error: 'Credenciales inválidas' });
+    res.json({ token: jwt.sign({ id }, JWT_SECRET, { expiresIn: '7d' }), role: user.role || 'free' });
 });
 
-function getTokenFromRequest(r){
-    // Authorization header preferred
-    const auth = r.headers && r.headers.authorization;
-    if (auth && typeof auth === 'string'){
-        const parts = auth.split(' ');
-        if (parts.length === 2 && parts[0] === 'Bearer') return parts[1];
-    }
-    // cookie fallback
-    const cookie = r.headers && r.headers.cookie;
-    if (cookie){
-        const match = cookie.match(/(?:^|; )token=([^;]+)/);
-        if (match) return decodeURIComponent(match[1]);
-    }
-    // localStorage is client-side; server can't read it
-    return null;
-}
+// --- SISTEMA DE CÓDIGOS PROMOCIONALES (CON FIX DE COMILLAS) ---
+app.post('/api/payments/check-promo', (req, res) => {
+    const { code } = req.body;
+    if (!code) return res.status(400).json({ valid: false });
 
-function authMiddleware(req, res, next) {
-    const token = getTokenFromRequest(req);
-    if (!token) return res.status(401).json({ error: 'Missing authorization' });
     try {
-        const payload = jwt.verify(token, JWT_SECRET);
-        req.user = payload;
-        return next();
-    } catch (err) {
-        return res.status(401).json({ error: 'Invalid token' });
-    }
-}
+        let rawCodes = process.env.PROMO_CODES || '{}';
+        rawCodes = rawCodes.trim().replace(/^'|'$/g, ''); // Limpiar comillas simples accidentales
+        const codes = JSON.parse(rawCodes);
+        const discount = codes[code.toUpperCase()];
 
-// Autosave XML for a project (requires auth)
-app.post('/api/project/:id/xml', authMiddleware, (req, res) => {
-    const id = req.params.id;
-    const { xml } = req.body;
-    if (!xml) return res.status(400).json({ error: 'Missing xml' });
-    const projects = readJSON('projects.json');
-    const project = projects[id] || { id, name: `Project ${id}`, xml: '', meta: {} };
-    project.xml = xml;
-    project.updatedAt = new Date().toISOString();
-    projects[id] = project;
-    if (!writeJSON('projects.json', projects)) return res.status(500).json({ error: 'Failed to autosave xml' });
-    res.json({ ok: true, updatedAt: project.updatedAt });
+        if (discount !== undefined) {
+            res.json({ valid: true, discount: discount });
+        } else {
+            res.status(404).json({ valid: false, message: "Código no válido" });
+        }
+    } catch (e) {
+        console.error("Error al leer PROMO_CODES:", e.message);
+        res.status(500).json({ error: "Error de configuración de descuentos" });
+    }
 });
 
-// --- Bot control endpoints ---
+// --- PAYPAL VERIFY ---
+app.post('/api/payments/verify-order', authMiddleware, async (req, res) => {
+    const { orderID } = req.body;
+    try {
+        const accessToken = await getPayPalAccessToken();
+        const response = await fetch(`https://api-m.paypal.com/v2/checkout/orders/${orderID}`, {
+            headers: { Authorization: `Bearer ${accessToken}` }
+        });
+        const orderData = await response.json();
+
+        if (orderData.status === 'COMPLETED') {
+            const users = readJSON('users.json');
+            if (users[req.user.id]) {
+                users[req.user.id].role = 'pro';
+                users[req.user.id].proSince = new Date();
+                writeJSON('users.json', users);
+                return res.json({ success: true, role: 'pro' });
+            }
+        }
+        res.status(400).json({ error: "Pago no válido" });
+    } catch (e) { res.status(500).json({ error: "Error en pasarela" }); }
+});
+
+// --- PROYECTOS (CRUD) ---
+app.get('/api/projects', authMiddleware, (req, res) => res.json(readJSON('projects.json')));
+
+app.post('/api/projects', authMiddleware, (req, res) => {
+    const { name, xml, code } = req.body;
+    const projects = readJSON('projects.json');
+    const id = Date.now().toString();
+    projects[id] = { id, name, xml: xml || '', code: code || '', owner: req.user.id, updatedAt: new Date() };
+    writeJSON('projects.json', projects);
+    res.json(projects[id]);
+});
+
+app.put('/api/projects/:id', authMiddleware, (req, res) => {
+    const projects = readJSON('projects.json');
+    const p = projects[req.params.id];
+    if (p && p.owner === req.user.id) {
+        p.xml = req.body.xml;
+        p.code = req.body.code;
+        p.updatedAt = new Date();
+        writeJSON('projects.json', projects);
+        res.json({ success: true });
+    } else res.status(403).json({ error: "No autorizado" });
+});
+
+app.delete('/api/projects/:id', authMiddleware, (req, res) => {
+    const projects = readJSON('projects.json');
+    if (projects[req.params.id]?.owner === req.user.id) {
+        if (botProcesses[req.params.id]) {
+            process.kill(botProcesses[req.params.id].pid);
+            delete botProcesses[req.params.id];
+        }
+        delete projects[req.params.id];
+        writeJSON('projects.json', projects);
+        res.json({ success: true });
+    } else res.status(403).json({ error: "No autorizado" });
+});
+
+// --- BOT ENGINE (CON MARCA DE AGUA FORZADA) ---
+const botProcesses = {};
+
 app.post('/api/bots/:id/start', authMiddleware, (req, res) => {
     const id = req.params.id;
+    const users = readJSON('users.json');
+    const user = users[req.user.id];
     const projects = readJSON('projects.json');
     const project = projects[id];
-    if (!project || !project.code) return res.status(400).json({ error: 'Project or code not found. Save project code before starting.' });
 
-    const botDir = path.join(dataDir, 'bots');
-    if (!fs.existsSync(botDir)) fs.mkdirSync(botDir, { recursive: true });
-    const botFile = path.join(botDir, `${id}.js`);
-    try {
-        fs.writeFileSync(botFile, project.code, { mode: 0o644 });
-    } catch (err) {
-        return res.status(500).json({ error: 'Failed to write bot file', details: err.message });
+    if (!project || !project.code) return res.status(400).json({ error: 'Sin código' });
+    if (project.owner !== req.user.id) return res.status(403).send();
+
+    if (user.role !== 'pro') {
+        const activeCount = Object.keys(botProcesses).filter(bid => projects[bid]?.owner === req.user.id).length;
+        if (activeCount >= 1) return res.status(403).json({ error: 'Límite Free: 1 Bot. ¡Sube a Pro!' });
     }
 
-    if (botProcesses[id]) return res.status(400).json({ error: 'Bot already running' });
-    const child = spawn(process.execPath, [botFile], { stdio: 'ignore' });
-    botProcesses[id] = { pid: child.pid, startedAt: new Date().toISOString() };
-    res.json({ ok: true, pid: child.pid });
+    if (botProcesses[id]) return res.status(400).json({ error: 'Ya está encendido' });
+
+    const botFile = path.join(botsDir, `${id}.js`);
+    
+    // --- LÓGICA DE MARCA DE AGUA ---
+    let finalCode = project.code;
+    if (user.role !== 'pro') {
+        const watermarkSnippet = `
+        // INYECCIÓN AUTOMÁTICA NOVA MAKE (FREE TIER)
+        client.on('ready', () => {
+            const updateNovaStatus = () => {
+                if (client.user) {
+                    client.user.setActivity('Hecho con Nova Make | make.novadefense.es', { type: 3 });
+                }
+            };
+            updateNovaStatus();
+            setInterval(updateNovaStatus, 30000); // Forzar cada 30 segundos
+        });
+        `;
+        finalCode += watermarkSnippet;
+    }
+
+    fs.writeFileSync(botFile, finalCode);
+
+    const child = spawn('node', [botFile]);
+    const duration = user.role === 'pro' ? (30 * 24 * 60 * 60 * 1000) : (2 * 24 * 60 * 60 * 1000);
+    const expiresAt = Date.now() + duration;
+
+    botProcesses[id] = { 
+        pid: child.pid, 
+        startedAt: new Date(),
+        expiresAt: new Date(expiresAt)
+    };
+
+    setTimeout(() => {
+        if (botProcesses[id]) {
+            process.kill(botProcesses[id].pid);
+            delete botProcesses[id];
+            console.log(`🛑 Ciclo terminado (${user.role}): ${id}`);
+        }
+    }, duration);
+
+    child.on('exit', () => delete botProcesses[id]);
+    res.json({ success: true, expiresAt: botProcesses[id].expiresAt });
 });
 
 app.post('/api/bots/:id/stop', authMiddleware, (req, res) => {
     const id = req.params.id;
-    const entry = botProcesses[id];
-    if (!entry) return res.status(404).json({ error: 'Bot not running' });
-    try {
-        process.kill(entry.pid);
+    if (botProcesses[id]) {
+        process.kill(botProcesses[id].pid);
         delete botProcesses[id];
-        return res.json({ ok: true });
-    } catch (err) {
-        return res.status(500).json({ error: 'Failed to stop process', details: err.message });
-    }
+        res.json({ success: true });
+    } else res.status(404).json({ error: "No está corriendo" });
 });
 
-app.get('/api/bots', authMiddleware, (req, res) => {
-    res.json(botProcesses);
-});
-
-// Protect dashboard route so only authenticated users can view it
-app.get('/dashboard.html', (req, res) => {
-    const token = getTokenFromRequest(req);
-    if (!token) return res.redirect('/login.html');
-    try { jwt.verify(token, JWT_SECRET); return res.sendFile(path.join(__dirname, 'dashboard.html')); }
-    catch(e){ return res.redirect('/login.html'); }
-});
-
-// Serve landing page at root; login remains at /login.html
-app.get('/', (req, res) => {
-    res.sendFile(path.join(__dirname, 'landing.html'));
-});
-
-app.get('/login.html', (req, res) => {
-    res.sendFile(path.join(__dirname, 'login.html'));
-});
-
-// Editor route (access block editor explicitly)
-app.get('/editor', (req, res) => {
-    // Serve editor page; client will show an in-page login modal if not authenticated.
-    res.sendFile(path.join(__dirname, 'index.html'));
-});
-
-// Endpoint para el despliegue futuro
-app.post('/api/deploy', (req, res) => {
-    const { code } = req.body;
-    console.log("Recibiendo código para despliegue...");
-    // Aquí irá la conexión con Pterodactyl
-    res.status(200).send({ message: "Código recibido correctamente" });
-});
-
-app.listen(3000, () => {
-    console.log('🚀 UNICORN ENGINE RUNNING: http://localhost:3000');
+app.use(express.static(__dirname));
+app.listen(PORT, () => {
+    console.log(`
+    ███╗   ██╗ ██████╗ ██╗   ██╗ █████╗ 
+    ████╗  ██║██╔═══██╗██║   ██║██╔══██╗
+    ██╔██╗ ██║██║   ██║██║   ██║███████║
+    ██║╚██╗██║██║   ██║╚██╗ ██╔╝██╔══██║
+    ██║ ╚████║╚██████╔╝ ╚████╔╝ ██║  ██║
+    🚀 UNICORN ENGINE V2: ONLINE PORT ${PORT}
+    `);
 });
