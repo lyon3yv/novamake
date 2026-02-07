@@ -390,6 +390,64 @@
             const xmlDom = Blockly.Xml.textToDom(xmlText);
             Blockly.Xml.domToWorkspace(xmlDom, workspace);
         }
+        
+        // --- Login modal for editor access ---
+        const loginModalHtml = `
+        <div id="editorLoginModal" style="position:fixed;inset:0;display:none;align-items:center;justify-content:center;background:rgba(0,0,0,0.6);z-index:999">
+          <div style="background:white;padding:22px;border-radius:12px;min-width:340px;box-shadow:0 18px 50px rgba(2,6,23,0.35)">
+            <h3 style="margin:0 0 6px">Inicia sesión para continuar</h3>
+            <p style="margin:0 0 12px;color:#6b7280">Accede para guardar y gestionar tus bots.</p>
+            <input id="loginModalId" placeholder="Usuario" style="width:100%;padding:10px;border-radius:8px;border:1px solid #e6e9ef;margin-bottom:8px" />
+            <input id="loginModalPassword" type="password" placeholder="Contraseña" style="width:100%;padding:10px;border-radius:8px;border:1px solid #e6e9ef;margin-bottom:12px" />
+            <div style="display:flex;gap:8px;justify-content:flex-end">
+              <button id="loginModalRegister" style="background:#fff;border:1px solid #e6e9ef;padding:8px 12px;border-radius:8px">Registrar</button>
+              <button id="loginModalLogin" style="background:linear-gradient(135deg,#6C5CE7,#a29bfe);color:white;padding:8px 12px;border-radius:8px">Iniciar</button>
+            </div>
+          </div>
+        </div>`;
+        document.body.insertAdjacentHTML('beforeend', loginModalHtml);
+
+        function getTokenFromCookie(){
+            const m = document.cookie.match(/(?:^|; )token=([^;]+)/);
+            return m ? decodeURIComponent(m[1]) : null;
+        }
+
+        function setAuthCookie(token){
+            const maxAge = 7*24*60*60;
+            document.cookie = `token=${encodeURIComponent(token)}; Path=/; Max-Age=${maxAge}; SameSite=Lax`;
+        }
+
+        async function showLoginIfNeeded(){
+            const token = getTokenFromCookie() || localStorage.getItem('token');
+            if (token) return; // already have token
+            const modal = document.getElementById('editorLoginModal');
+            modal.style.display = 'flex';
+            document.getElementById('loginModalLogin').onclick = async ()=>{
+                const id = document.getElementById('loginModalId').value.trim();
+                const password = document.getElementById('loginModalPassword').value;
+                if(!id||!password){ alert('Rellena ambos campos'); return }
+                try{
+                    const res = await fetch('/api/auth/login', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ id, password }) });
+                    const body = await res.json();
+                    if (body.token){ localStorage.setItem('token', body.token); setAuthCookie(body.token); modal.style.display='none'; }
+                    else alert(body.error || 'Error');
+                }catch(e){ alert('Error de conexión'); }
+            };
+            document.getElementById('loginModalRegister').onclick = async ()=>{
+                const id = document.getElementById('loginModalId').value.trim();
+                const password = document.getElementById('loginModalPassword').value;
+                if(!id||!password){ alert('Rellena ambos campos'); return }
+                try{
+                    const res = await fetch('/api/auth/register', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ id, password }) });
+                    const body = await res.json();
+                    if (body.token){ localStorage.setItem('token', body.token); setAuthCookie(body.token); modal.style.display='none'; }
+                    else alert(body.error || 'Error');
+                }catch(e){ alert('Error de conexión'); }
+            };
+        }
+
+        // Show login modal when editor loads if there's no token
+        showLoginIfNeeded();
 
         function deploy() {
             const code = javascript.javascriptGenerator.workspaceToCode(workspace);
@@ -473,19 +531,24 @@
             return id;
         }
 
-        async function saveXml(){
+        async function saveProjectData(){
             const id = await ensureProjectExists();
             if (!id) return;
             const xml = Blockly.Xml.domToText(Blockly.Xml.workspaceToDom(workspace));
+            let code = '';
             try{
-                await fetch(`/api/project/${id}/xml`, { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({ xml }) });
+                // Generate JS code from workspace
+                if (window.Blockly && window.Blockly.JavaScript) code = Blockly.JavaScript.workspaceToCode(workspace);
+                // Update project via PUT
+                const res = await fetch(`/api/projects/${id}`, { method: 'PUT', headers: {'Content-Type':'application/json'}, body: JSON.stringify({ xml, code }) });
+                if (!res.ok) throw new Error('save failed');
                 console.debug('Autosaved project', id);
             }catch(e){ console.warn('Autosave failed', e.message); }
         }
 
         function scheduleSave(){
             if (saveTimeout) clearTimeout(saveTimeout);
-            saveTimeout = setTimeout(() => { saveXml(); saveTimeout = null; }, SAVE_DELAY);
+            saveTimeout = setTimeout(() => { saveProjectData(); saveTimeout = null; }, SAVE_DELAY);
         }
 
         workspace.addChangeListener((ev)=>{
@@ -495,7 +558,23 @@
         });
 
         // Periodic backup
-        setInterval(()=>{ if (!saveTimeout) saveXml(); }, 30000);
+        setInterval(()=>{ if (!saveTimeout) saveProjectData(); }, 30000);
+
+        // Deploy button: ensure project saved (code + xml) before showing deploy action
+        async function deploy(){
+            const id = await ensureProjectExists();
+            if (!id) return alert('No se pudo crear el proyecto.');
+            // save now
+            await saveProjectData();
+            // Generate code for preview or sending to deploy pipeline
+            let code = '';
+            try{ if (window.Blockly && window.Blockly.JavaScript) code = Blockly.JavaScript.workspaceToCode(workspace); } catch(e){ /* ignore */ }
+            // Optional: send to /api/deploy (placeholder)
+            try{
+                await fetch('/api/deploy', { method: 'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ code, projectId: id }) });
+            }catch(e){ console.warn('deploy endpoint failed', e.message); }
+            alert('🚀 Código guardado y preparación para despliegue completa.');
+        }
     </script>
 </body>
 </html>

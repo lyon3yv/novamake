@@ -84,19 +84,19 @@ function writeJSON(filename, obj) {
 }
 
 // Projects endpoints
-app.get('/api/projects', (req, res) => {
+app.get('/api/projects', authMiddleware, (req, res) => {
     const projects = readJSON('projects.json');
     res.json(projects);
 });
 
-app.get('/api/projects/:id', (req, res) => {
+app.get('/api/projects/:id', authMiddleware, (req, res) => {
     const projects = readJSON('projects.json');
     const id = req.params.id;
     if (!projects[id]) return res.status(404).json({ error: 'Project not found' });
     res.json(projects[id]);
 });
 
-app.post('/api/projects', (req, res) => {
+app.post('/api/projects', authMiddleware, (req, res) => {
     const { id, name, xml, meta } = req.body;
     const projects = readJSON('projects.json');
     const projectId = id || Date.now().toString();
@@ -105,7 +105,22 @@ app.post('/api/projects', (req, res) => {
     res.json(projects[projectId]);
 });
 
-app.delete('/api/projects/:id', (req, res) => {
+// Update project (xml / code / name)
+app.put('/api/projects/:id', authMiddleware, (req, res) => {
+    const id = req.params.id;
+    const { name, xml, code, meta } = req.body;
+    const projects = readJSON('projects.json');
+    if (!projects[id]) return res.status(404).json({ error: 'Project not found' });
+    if (name !== undefined) projects[id].name = name;
+    if (xml !== undefined) projects[id].xml = xml;
+    if (code !== undefined) projects[id].code = code;
+    if (meta !== undefined) projects[id].meta = meta;
+    projects[id].updatedAt = new Date().toISOString();
+    if (!writeJSON('projects.json', projects)) return res.status(500).json({ error: 'Failed to update project' });
+    res.json(projects[id]);
+});
+
+app.delete('/api/projects/:id', authMiddleware, (req, res) => {
     const projects = readJSON('projects.json');
     const id = req.params.id;
     if (!projects[id]) return res.status(404).json({ error: 'Project not found' });
@@ -153,12 +168,26 @@ app.post('/api/auth/login', (req, res) => {
     res.json({ id, token });
 });
 
+function getTokenFromRequest(r){
+    // Authorization header preferred
+    const auth = r.headers && r.headers.authorization;
+    if (auth && typeof auth === 'string'){
+        const parts = auth.split(' ');
+        if (parts.length === 2 && parts[0] === 'Bearer') return parts[1];
+    }
+    // cookie fallback
+    const cookie = r.headers && r.headers.cookie;
+    if (cookie){
+        const match = cookie.match(/(?:^|; )token=([^;]+)/);
+        if (match) return decodeURIComponent(match[1]);
+    }
+    // localStorage is client-side; server can't read it
+    return null;
+}
+
 function authMiddleware(req, res, next) {
-    const auth = req.headers.authorization;
-    if (!auth) return res.status(401).json({ error: 'Missing authorization' });
-    const parts = auth.split(' ');
-    if (parts.length !== 2) return res.status(401).json({ error: 'Invalid authorization format' });
-    const token = parts[1];
+    const token = getTokenFromRequest(req);
+    if (!token) return res.status(401).json({ error: 'Missing authorization' });
     try {
         const payload = jwt.verify(token, JWT_SECRET);
         req.user = payload;
@@ -168,8 +197,8 @@ function authMiddleware(req, res, next) {
     }
 }
 
-// Autosave XML for a project
-app.post('/api/project/:id/xml', (req, res) => {
+// Autosave XML for a project (requires auth)
+app.post('/api/project/:id/xml', authMiddleware, (req, res) => {
     const id = req.params.id;
     const { xml } = req.body;
     if (!xml) return res.status(400).json({ error: 'Missing xml' });
@@ -221,6 +250,14 @@ app.get('/api/bots', authMiddleware, (req, res) => {
     res.json(botProcesses);
 });
 
+// Protect dashboard route so only authenticated users can view it
+app.get('/dashboard.html', (req, res) => {
+    const token = getTokenFromRequest(req);
+    if (!token) return res.redirect('/login.html');
+    try { jwt.verify(token, JWT_SECRET); return res.sendFile(path.join(__dirname, 'dashboard.html')); }
+    catch(e){ return res.redirect('/login.html'); }
+});
+
 // Serve landing page at root; login remains at /login.html
 app.get('/', (req, res) => {
     res.sendFile(path.join(__dirname, 'landing.html'));
@@ -232,6 +269,7 @@ app.get('/login.html', (req, res) => {
 
 // Editor route (access block editor explicitly)
 app.get('/editor', (req, res) => {
+    // Serve editor page; client will show an in-page login modal if not authenticated.
     res.sendFile(path.join(__dirname, 'index.html'));
 });
 

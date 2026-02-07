@@ -6,16 +6,19 @@
   <title>Nova Make — Build Discord Bots Visually</title>
   <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;600;800&family=Quicksand:wght@500;700&display=swap" rel="stylesheet">
   <style>
-    body{font-family:'Outfit',sans-serif;margin:0;background:linear-gradient(180deg,#f7f9ff,#eef6ff);color:#1f2937}
-    .hero{max-width:980px;margin:80px auto;padding:40px;background:white;border-radius:16px;box-shadow:0 20px 40px rgba(16,24,40,.08);display:flex;gap:24px;align-items:center}
-    .brand{display:flex;flex-direction:column}
-    .logo{width:88px;height:88px;border-radius:18px;background:linear-gradient(135deg,#6C5CE7,#00CEC9);display:grid;place-items:center;color:white;font-size:36px}
-    h1{margin:0;font-size:28px}
-    p{color:#475569}
+    body{font-family:'Outfit',sans-serif;margin:0;background:linear-gradient(180deg,#eef2ff,#ffffff);color:#0f1724}
+    .container{max-width:1100px;margin:56px auto;padding:28px}
+    .hero{display:flex;gap:28px;align-items:center}
+    .brand{flex:1}
+    .logo{width:96px;height:96px;border-radius:18px;background:linear-gradient(135deg,#6C5CE7,#00CEC9);display:grid;place-items:center;color:white;font-size:40px}
+    h1{margin:0;font-size:32px;line-height:1.05}
+    p{color:#475569;margin-top:8px}
     .cta{margin-top:18px}
     .btn{padding:12px 18px;border-radius:12px;border:none;font-weight:700;cursor:pointer}
-    .primary{background:linear-gradient(135deg,#6C5CE7,#a29bfe);color:white}
+    .primary{background:linear-gradient(135deg,#6C5CE7,#a29bfe);color:white;box-shadow:0 12px 30px rgba(108,92,231,0.14)}
     .secondary{background:white;border:1px solid #e6e9ef;color:#334155}
+    .features{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-top:22px}
+    .feature{background:white;padding:14px;border-radius:12px;box-shadow:0 8px 20px rgba(2,6,23,0.04);}
     .links{margin-left:auto}
   </style>
 </head>
@@ -26,16 +29,32 @@
         <div class="logo">🚀</div>
         <div>
           <h1>Nova Make</h1>
-          <p>Construye, despliega y gestiona bots de Discord sin escribir código.</p>
+          <p>Construye, despliega y gestiona bots de Discord sin escribir código. Visual, rápido y listo para producción.</p>
         </div>
       </div>
       <div class="cta">
         <button class="btn primary" onclick="location.href='/login.html'">Iniciar sesión</button>
-        <button class="btn secondary" onclick="location.href='/editor'" style="margin-left:12px">Abrir editor</button>
+        <button class="btn secondary" onclick="location.href='/login.html'" style="margin-left:12px">Crear cuenta</button>
       </div>
     </div>
     <div class="links">
-      <img src="nova (5).png" style="width:240px;opacity:.95;border-radius:14px;">
+      <img src="nova (5).png" style="width:260px;opacity:.95;border-radius:14px;">
+    </div>
+  </div>
+  <div class="container">
+    <div class="features">
+      <div class="feature">
+        <h4 style="margin:0 0 6px">Editor Visual</h4>
+        <p style="margin:0;color:#6b7280">Arrastra bloques, conecta eventos y genera código listo para ejecutar.</p>
+      </div>
+      <div class="feature">
+        <h4 style="margin:0 0 6px">Deploy con 1 click</h4>
+        <p style="margin:0;color:#6b7280">Integra con PM2 y despliega en tu VPS con las herramientas que ya tienes.</p>
+      </div>
+      <div class="feature">
+        <h4 style="margin:0 0 6px">Persistencia segura</h4>
+        <p style="margin:0;color:#6b7280">Tus proyectos se guardan localmente en `/data` para control total y backups fáciles.</p>
+      </div>
     </div>
   </div>
 </body>
