@@ -167,7 +167,10 @@
             </div>
             <button id="newProjectBtn" class="btn-launch" style="background:linear-gradient(135deg,#00CEC9,#00b2a9);">Nuevo Proyecto</button>
         </div>
-        <div style="margin-left:auto"><button class="btn-launch" onclick="deploy()">Lanzar a la Nube</button></div>
+        <div style="margin-left:auto;display:flex;align-items:center;gap:10px;">
+            <button class="btn-launch" onclick="saveProject()">💾 Guardar</button>
+            <button class="btn-launch" onclick="deploy()">Lanzar a la Nube</button>
+        </div>
     </header>
 
     <div id="main-wrapper">
@@ -177,6 +180,18 @@
     <script src="blocks.js"></script>
     <script src="generator.js"></script>
     <script>
+        // --- Leer parámetro project desde la URL (si existe) ---
+        const urlParams = new URLSearchParams(window.location.search);
+        const currentProject = urlParams.get('project');
+        let currentProjectNameFromUrl = currentProject || null;
+        if (currentProject) {
+            console.log("Editando proyecto activo:", currentProject);
+            document.title = `Editando: ${currentProject} — Nova Make`;
+            // cargamos desde servidor
+            // la función `loadProjectFromServer` está declarada más abajo
+            try { loadProjectFromServer(currentProject); } catch(e) { console.warn(e); }
+        }
+
         const toolbox = {
             "kind": "categoryToolbox",
             "contents": [
@@ -502,6 +517,41 @@
             }catch(e){ console.warn('Failed load project', e.message); }
         }
 
+        // Cargar proyecto por nombre (cuando se pasa ?project=Nombre)
+        async function loadProjectFromServer(name) {
+            try {
+                const token = getTokenFromCookie() || localStorage.getItem('token');
+                const res = await fetch('/api/projects', { headers: { 'Authorization': token ? `Bearer ${token}` : '' } });
+                if (!res.ok) { console.warn('No se pudo listar proyectos'); return; }
+                const all = await res.json();
+                const projects = Array.isArray(all) ? all : Object.values(all);
+                const found = projects.find(p => p.name === name);
+                if (!found) {
+                    console.log('Proyecto no encontrado en API:', name);
+                    // set header name so user knows which project is being edited
+                    document.getElementById('projectNameHeader').textContent = name;
+                    currentProjectName = name;
+                    return;
+                }
+                // set current project id so autosave and deploy use it
+                currentProjectId = found.id || found._id || found.name;
+                if (found.id) localStorage.setItem('projectId', found.id);
+                currentProjectName = found.name;
+                document.getElementById('projectNameHeader').textContent = currentProjectName;
+                if (found.xml) {
+                    const xmlDom = Blockly.Xml.textToDom(found.xml);
+                    Blockly.Xml.domToWorkspace(xmlDom, workspace);
+                } else if (found.code) {
+                    // If only code is present, leave workspace empty (can't reverse JS->blocks)
+                    console.log('Proyecto tiene code pero no xml');
+                } else if (found.blocksData) {
+                    try { Blockly.serialization.workspaces.load(found.blocksData, workspace); } catch (e) { console.warn('No se pudo cargar blocksData', e); }
+                }
+            } catch (e) {
+                console.warn('Error cargando proyecto por nombre', e);
+            }
+        }
+
         async function promptNewProject(){
             const modal = document.getElementById('nameModal');
             const input = document.getElementById('projectNameInput');
@@ -539,11 +589,51 @@
             try{
                 // Generate JS code from workspace
                 if (window.Blockly && window.Blockly.JavaScript) code = Blockly.JavaScript.workspaceToCode(workspace);
-                // Update project via PUT
-                const res = await fetch(`/api/projects/${id}`, { method: 'PUT', headers: {'Content-Type':'application/json'}, body: JSON.stringify({ xml, code }) });
+                const token = getTokenFromCookie() || localStorage.getItem('token');
+                // Update project via PUT (authenticated)
+                const res = await fetch(`/api/projects/${id}`, { method: 'PUT', headers: {'Content-Type':'application/json', 'Authorization': token ? `Bearer ${token}` : ''}, body: JSON.stringify({ xml, code }) });
                 if (!res.ok) throw new Error('save failed');
                 console.debug('Autosaved project', id);
             }catch(e){ console.warn('Autosave failed', e.message); }
+        }
+
+        // Guardar proyecto vía API /api/projects (POST o PUT según exista id)
+        async function saveProject() {
+            if (!currentProjectNameFromUrl && !currentProjectName) return alert('Error: No hay proyecto asociado.');
+            const projectNameToUse = currentProjectNameFromUrl || currentProjectName;
+            const token = getTokenFromCookie() || localStorage.getItem('token');
+            const xml = Blockly.Xml.domToText(Blockly.Xml.workspaceToDom(workspace));
+            let code = '';
+            if (window.Blockly && window.Blockly.JavaScript) code = Blockly.JavaScript.workspaceToCode(workspace);
+            try {
+                if (currentProjectId) {
+                    const res = await fetch(`/api/projects/${currentProjectId}`, {
+                        method: 'PUT',
+                        headers: { 'Content-Type': 'application/json', 'Authorization': token ? `Bearer ${token}` : '' },
+                        body: JSON.stringify({ xml, code })
+                    });
+                    if (res.ok) { alert('¡Progreso guardado en la VPS!'); return; }
+                }
+
+                // Si no existe id, crear
+                const res2 = await fetch('/api/projects', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json', 'Authorization': token ? `Bearer ${token}` : '' },
+                    body: JSON.stringify({ name: projectNameToUse, xml, code })
+                });
+                if (!res2.ok) throw new Error('create failed');
+                const body = await res2.json();
+                if (body && body.id) {
+                    currentProjectId = body.id;
+                    localStorage.setItem('projectId', body.id);
+                    currentProjectName = body.name || projectNameToUse;
+                    document.getElementById('projectNameHeader').textContent = currentProjectName;
+                    alert('¡Proyecto creado y guardado!');
+                }
+            } catch (e) {
+                console.warn('saveProject error', e);
+                alert('Error guardando proyecto.');
+            }
         }
 
         function scheduleSave(){

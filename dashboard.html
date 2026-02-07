@@ -268,7 +268,7 @@
               </div>
             </div>
             <div style="display:flex; gap:10px">
-              <button class="btn btn-s" onclick="editBot('${p.id}')" title="Editar Bloques"><i class="fas fa-edit"></i></button>
+              <button class="btn btn-s" onclick="editProject('${encodeURIComponent(p.name)}')" title="Editar Bloques"><i class="fas fa-edit"></i></button>
               <button class="btn btn-p" onclick="startBot('${p.id}')" title="Iniciar Bot"><i class="fas fa-play"></i></button>
               <button class="btn btn-danger" onclick="deleteBot('${p.id}')" title="Eliminar"><i class="fas fa-trash"></i></button>
             </div>
@@ -313,6 +313,17 @@
       localStorage.setItem('projectId', id);
       window.location.href = '/editor';
     };
+
+    // Redirige al editor pasando el nombre del proyecto como parámetro
+    function editProject(projectNameEncoded) {
+      try {
+        const projectName = decodeURIComponent(projectNameEncoded);
+        window.location.href = `/editor?project=${encodeURIComponent(projectName)}`;
+      } catch (e) {
+        // fallback
+        window.location.href = '/editor';
+      }
+    }
 
     window.deleteBot = async (id) => {
       if(!confirm("¿Seguro que quieres borrar este bot? Se perderá el código.")) return;

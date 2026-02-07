@@ -13,7 +13,7 @@ const app = express();
 const JWT_SECRET = process.env.JWT_SECRET || 'nova_ultra_secret_safe_2026';
 const PAYPAL_CLIENT_ID = 'AQ8uY-S_fFiRxnD27te6sVOQSx8S60pCHYXBk1sK82e7oNXWVQR4QxhYaT2G3T4L5LSuHDxbPgheKwUd';
 const PAYPAL_SECRET = process.env.PAYPAL_SECRET; 
-const PORT = 3000;
+const PORT = process.env.PORT || 3000;
 
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
@@ -35,9 +35,12 @@ ensureDataInfrastructure();
 
 // --- HELPERS ---
 function readJSON(file) {
-    try { return JSON.parse(fs.readFileSync(path.join(dataDir, file), 'utf8') || '{}'); }
-    catch (e) { return {}; }
+    try { 
+        const content = fs.readFileSync(path.join(dataDir, file), 'utf8');
+        return JSON.parse(content || '{}'); 
+    } catch (e) { return {}; }
 }
+
 function writeJSON(file, data) {
     fs.writeFileSync(path.join(dataDir, file), JSON.stringify(data, null, 2));
 }
@@ -58,7 +61,10 @@ async function getPayPalAccessToken() {
     const response = await fetch('https://api-m.paypal.com/v1/oauth2/token', {
         method: 'POST',
         body: 'grant_type=client_credentials',
-        headers: { Authorization: `Basic ${auth}`, 'Content-Type': 'application/x-www-form-urlencoded' }
+        headers: { 
+            Authorization: `Basic ${auth}`, 
+            'Content-Type': 'application/x-www-form-urlencoded' 
+        }
     });
     const data = await response.json();
     return data.access_token;
@@ -88,24 +94,21 @@ app.post('/api/auth/login', (req, res) => {
     res.json({ token: jwt.sign({ id }, JWT_SECRET, { expiresIn: '7d' }), role: user.role || 'free' });
 });
 
-// --- SISTEMA DE CÓDIGOS PROMOCIONALES (CON FIX DE COMILLAS) ---
+// --- SISTEMA DE CÓDIGOS PROMOCIONALES ---
 app.post('/api/payments/check-promo', (req, res) => {
     const { code } = req.body;
     if (!code) return res.status(400).json({ valid: false });
-
     try {
         let rawCodes = process.env.PROMO_CODES || '{}';
-        rawCodes = rawCodes.trim().replace(/^'|'$/g, ''); // Limpiar comillas simples accidentales
+        rawCodes = rawCodes.trim().replace(/^'|'$/g, ''); 
         const codes = JSON.parse(rawCodes);
         const discount = codes[code.toUpperCase()];
-
         if (discount !== undefined) {
             res.json({ valid: true, discount: discount });
         } else {
             res.status(404).json({ valid: false, message: "Código no válido" });
         }
     } catch (e) {
-        console.error("Error al leer PROMO_CODES:", e.message);
         res.status(500).json({ error: "Error de configuración de descuentos" });
     }
 });
@@ -119,7 +122,6 @@ app.post('/api/payments/verify-order', authMiddleware, async (req, res) => {
             headers: { Authorization: `Bearer ${accessToken}` }
         });
         const orderData = await response.json();
-
         if (orderData.status === 'COMPLETED') {
             const users = readJSON('users.json');
             if (users[req.user.id]) {
@@ -143,6 +145,18 @@ app.post('/api/projects', authMiddleware, (req, res) => {
     projects[id] = { id, name, xml: xml || '', code: code || '', owner: req.user.id, updatedAt: new Date() };
     writeJSON('projects.json', projects);
     res.json(projects[id]);
+});
+
+// --- NUEVA RUTA DE GUARDADO DIRECTO ---
+app.post('/save-project', (req, res) => {
+    const { projectName, blocksData } = req.body;
+    if (!projectName) return res.status(400).send("Nombre de proyecto requerido");
+    
+    const filePath = path.join(dataDir, `${projectName}.json`);
+    fs.writeFile(filePath, JSON.stringify(blocksData, null, 2), (err) => {
+        if (err) return res.status(500).send("Error al guardar");
+        res.send("Proyecto guardado con éxito");
+    });
 });
 
 app.put('/api/projects/:id', authMiddleware, (req, res) => {
@@ -170,7 +184,7 @@ app.delete('/api/projects/:id', authMiddleware, (req, res) => {
     } else res.status(403).json({ error: "No autorizado" });
 });
 
-// --- BOT ENGINE (CON MARCA DE AGUA FORZADA) ---
+// --- BOT ENGINE ---
 const botProcesses = {};
 
 app.post('/api/bots/:id/start', authMiddleware, (req, res) => {
@@ -192,41 +206,33 @@ app.post('/api/bots/:id/start', authMiddleware, (req, res) => {
 
     const botFile = path.join(botsDir, `${id}.js`);
     
-    // --- LÓGICA DE MARCA DE AGUA ---
     let finalCode = project.code;
     if (user.role !== 'pro') {
-        const watermarkSnippet = `
-        // INYECCIÓN AUTOMÁTICA NOVA MAKE (FREE TIER)
+        finalCode += `
+        // WATERMARK NOVA MAKE
         client.on('ready', () => {
-            const updateNovaStatus = () => {
-                if (client.user) {
-                    client.user.setActivity('Hecho con Nova Make | make.novadefense.es', { type: 3 });
-                }
+            const updateStatus = () => {
+                if (client.user) client.user.setActivity('Hecho con Nova Make | make.novadefense.es', { type: 3 });
             };
-            updateNovaStatus();
-            setInterval(updateNovaStatus, 30000); // Forzar cada 30 segundos
-        });
-        `;
-        finalCode += watermarkSnippet;
+            updateStatus();
+            setInterval(updateStatus, 30000);
+        });`;
     }
 
     fs.writeFileSync(botFile, finalCode);
-
     const child = spawn('node', [botFile]);
     const duration = user.role === 'pro' ? (30 * 24 * 60 * 60 * 1000) : (2 * 24 * 60 * 60 * 1000);
-    const expiresAt = Date.now() + duration;
 
     botProcesses[id] = { 
         pid: child.pid, 
         startedAt: new Date(),
-        expiresAt: new Date(expiresAt)
+        expiresAt: new Date(Date.now() + duration)
     };
 
     setTimeout(() => {
         if (botProcesses[id]) {
-            process.kill(botProcesses[id].pid);
+            try { process.kill(botProcesses[id].pid); } catch(e){}
             delete botProcesses[id];
-            console.log(`🛑 Ciclo terminado (${user.role}): ${id}`);
         }
     }, duration);
 
@@ -237,20 +243,22 @@ app.post('/api/bots/:id/start', authMiddleware, (req, res) => {
 app.post('/api/bots/:id/stop', authMiddleware, (req, res) => {
     const id = req.params.id;
     if (botProcesses[id]) {
-        process.kill(botProcesses[id].pid);
+        try { process.kill(botProcesses[id].pid); } catch(e){}
         delete botProcesses[id];
         res.json({ success: true });
     } else res.status(404).json({ error: "No está corriendo" });
 });
 
+// --- ESTÁTICOS Y ARRANQUE ---
 app.use(express.static(__dirname));
+
 app.listen(PORT, () => {
     console.log(`
-    ███╗   ██╗ ██████╗ ██╗   ██╗ █████╗ 
+    ███╗    ██╗ ██████╗ ██╗   ██╗ █████╗ 
     ████╗  ██║██╔═══██╗██║   ██║██╔══██╗
     ██╔██╗ ██║██║   ██║██║   ██║███████║
     ██║╚██╗██║██║   ██║╚██╗ ██╔╝██╔══██║
     ██║ ╚████║╚██████╔╝ ╚████╔╝ ██║  ██║
     🚀 UNICORN ENGINE V2: ONLINE PORT ${PORT}
-    `);
+    `); 
 });
